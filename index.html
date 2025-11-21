@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emotion Detector with Voice Input</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f6f6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 12px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #4a90e2;
+      color: #fff;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover { background: #3579c8; }
+
+    #resultBox {
+      margin-top: 30px;
+      background: white;
+      padding: 20px;
+      width: 350px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    #transcript { font-weight: bold; }
+    #emotion { font-size: 22px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Emotion Detector (Voice Input)</h1>
+  <button id="startBtn">🎤 Start Listening</button>
+  <button id="stopBtn">⛔ Stop</button>
+
+  <div id="resultBox">
+    <div>Transcript:</div>
+    <div id="transcript">---</div>
+    <div id="emotion">Emotion: ---</div>
+  </div>
+
+  <script>
+    // Basic sentiment mapping
+    function detectEmotion(text) {
+      text = text.toLowerCase();
+      const happyWords = ["happy", "great", "awesome", "good", "joy", "excited"];
+      const sadWords = ["sad", "down", "upset", "unhappy", "depressed"];
+      const angryWords = ["angry", "mad", "furious", "irritated"];
+
+      if (happyWords.some(w => text.includes(w))) return "😊 Happy";
+      if (sadWords.some(w => text.includes(w))) return "😢 Sad";
+      if (angryWords.some(w => text.includes(w))) return "😡 Angry";
+      return "😐 Neutral";
+    }
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const transcriptEl = document.getElementById("transcript");
+    const emotionEl = document.getElementById("emotion");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      transcriptEl.textContent = text;
+      emotionEl.textContent = "Emotion: " + detectEmotion(text);
+    };
+
+    startBtn.onclick = () => {
+      recognition.start();
+    };
+
+    stopBtn.onclick = () => {
+      recognition.stop();
+    };
+    // --- API-based Emotion Detection (HuggingFace) ---
+  const API_URL = "https://api-inference.huggingface.co/models/bhadresh-savani/distilbert-base-uncased-emotion";
+  const API_KEY = "Yhf_VEgqqshCrtVscBFwHIpgiPJhKIPfapYSht"; // ← replace with your HuggingFace API key
+
+  async function apiDetectEmotion(text) {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ inputs: text })
+    });
+
+    const result = await response.json();
+    if (!Array.isArray(result) || !result[0]) return "Unknown";
+
+    const emotions = result[0];
+    emotions.sort((a, b) => b.score - a.score);
+    return emotions[0].label;
+  }
+
+  recognition.onresult = async (event) => {
+    const text = event.results[0][0].transcript;
+    transcriptEl.textContent = text;
+    emotionEl.textContent = "Emotion: Detecting...";
+
+    const emotion = await apiDetectEmotion(text);
+    emotionEl.textContent = "Emotion: " + emotion;
+  }; (TensorFlow.js) ---
+  async function loadModel() {
+    window.emotionModel = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/sentiment_cnn_v1/model.json');
+    console.log("ML Emotion Model Loaded");
+  }
+  loadModel();
+
+  function mlDetectEmotion(text) {
+    if (!window.emotionModel) return "Loading...";
+
+    const trimmed = text.toLowerCase().replace(/[^a-zA-Z ]/g, "").trim();
+    const words = trimmed.split(" ");
+
+    const input = new Array(100).fill(0);
+    for (let i = 0; i < Math.min(words.length, 100); i++) {
+      input[i] = words[i].length;
+    }
+
+    const tensor = tf.tensor([input]);
+    const prediction = window.emotionModel.predict(tensor).dataSync()[0];
+
+    if (prediction > 0.6) return "😊 Positive";
+    if (prediction < 0.4) return "😢 Negative";
+    return "😐 Neutral";
+  }
+
+  recognition.onresult = (event) => {
+    const text = event.results[0][0].transcript;
+    transcriptEl.textContent = text;
+    emotionEl.textContent = "Emotion: " + mlDetectEmotion(text);
+  };
+
+</script>
+</body>
+</html>
